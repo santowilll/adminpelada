@@ -1,13 +1,6 @@
 <?php
-/**
- * SISTEMA DE GESTÃO DE PELADA - VERSÃO PRODUÇÃO (HOSTINGER)
- * Funcionalidades: Login, Filtros, Busca, Histórico, Mobile-First
- */
-
 header('Content-Type: text/html; charset=utf-8');
 session_start();
-
-// Segurança: Não exibir erros técnicos ao usuário final na Hostinger
 ini_set('display_errors', 0);
 error_reporting(E_ALL);
 
@@ -35,7 +28,6 @@ class Database {
         
         $userCheck = $this->db->query("SELECT * FROM usuarios WHERE usuario = 'admin'");
         if (!$userCheck->fetch()) {
-            // Senha padrão: Bau2026@DioU@
             $hashPadrao = '$2y$10$9GvG7lC1Q.K5XUeS1XfXduIu0H0xV8v2GqFzXkR0f6S8fD/Y8hC2y';
             $this->db->prepare("INSERT INTO usuarios (usuario, senha) VALUES ('admin', ?)")->execute([$hashPadrao]);
         }
@@ -46,7 +38,6 @@ class Database {
 $database = new Database();
 $db = $database->getConnection();
 
-// --- LÓGICA DE LOGIN ---
 if (isset($_POST['acao']) && $_POST['acao'] === 'login') {
     $stmt = $db->prepare("SELECT * FROM usuarios WHERE usuario = ?");
     $stmt->execute([$_POST['usuario']]);
@@ -93,13 +84,11 @@ if (!isset($_SESSION['logado'])):
 <?php exit; endif; ?>
 
 <?php
-// --- CONFIGURAÇÕES DE EXIBIÇÃO ---
 $ano_selecionado = filter_input(INPUT_GET, 'ano', FILTER_SANITIZE_NUMBER_INT) ?: date('Y');
 $busca = filter_input(INPUT_GET, 'busca', FILTER_SANITIZE_SPECIAL_CHARS) ?: '';
 $ordem = $_GET['ordem'] ?? 'nome';
 $mes_atual = date('n');
 
-// --- PROCESSAMENTO SEGURO (POST) ---
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $acao = $_POST['acao'] ?? '';
 
@@ -153,7 +142,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     header("Location: index.php?ano=$ano_selecionado&busca=$busca&ordem=$ordem"); exit;
 }
 
-// --- CONSULTA SEGURA DOS JOGADORES ---
 $params = [$ano_selecionado];
 $sql = "SELECT j.*, (SELECT SUM(valor) FROM pagamentos WHERE jogador_id = j.id AND ano = ? AND pago = 1) as total_pago 
         FROM jogadores j WHERE ativo = 1";
@@ -179,13 +167,14 @@ $transacoes = $stmt_t->fetchAll(PDO::FETCH_ASSOC);
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <style>
         .sticky-col { position: sticky; left: 0; background: white; z-index: 10; border-right: 2px solid #f1f5f9; }
-        .pay-btn { width: 34px; height: 34px; font-size: 10px; }
-        @media (min-width: 768px) { .pay-btn { width: 44px; height: 44px; font-size: 12px; } }
+        .pay-btn { width: 28px; height: 28px; font-size: 10px; }
+        @media (min-width: 768px) { .pay-btn { width: 30px; height: 30px; font-size: 12px; } }
         body { -webkit-tap-highlight-color: transparent; }
     </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 </head>
 <body class="bg-gray-50 pb-12">
-    <div class="container mx-auto px-2 md:px-6 py-8">
+    <div class="mx-auto px-2 md:px-6 py-8">
         
         <header class="flex justify-between items-center mb-8">
             <div>
@@ -216,12 +205,12 @@ $transacoes = $stmt_t->fetchAll(PDO::FETCH_ASSOC);
             </form>
         </div>
 
-        <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden mb-8">
+        <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden mb-8">
             <div class="overflow-x-auto">
-                <table class="w-full text-left">
+                <table id="tabelaPelada" class="w-full text-left">
                     <thead class="bg-slate-50 border-b border-slate-100">
-                        <tr class="text-[10px] uppercase text-slate-400 font-black">
-                            <th class="px-4 py-5 sticky-col">Jogador</th>
+                        <tr class="text-[13px] uppercase text-slate-400 font-black">
+                            <th class="px-1 py-2 text-grey-300">Jogador</th>
                             <?php foreach($meses as $idx => $m): ?>
                                 <th class="px-1 text-center <?= ($idx+1) == $mes_atual ? 'text-blue-500 bg-blue-50/50' : '' ?>"><?= $m ?></th>
                             <?php endforeach; ?>
@@ -234,17 +223,17 @@ $transacoes = $stmt_t->fetchAll(PDO::FETCH_ASSOC);
                             $pags = $stmt_p->fetchAll();
                         ?>
                         <tr class="hover:bg-slate-50/80 transition">
-                            <td class="px-4 py-4 sticky-col">
-                                <span class="font-bold text-slate-700 block truncate w-32 md:w-56"><?= htmlspecialchars($j['nome']) ?></span>
-                                <div class="flex gap-2 mt-1 items-center">
+                            <td class="px-1 py-1">
+                                <span class="font-bold text-slate-700 block"><?= htmlspecialchars($j['nome']) ?></span>
+                                <div class="flex gap-2 items-center">
                                     <span class="text-[9px] font-black text-green-500 uppercase">R$<?= number_format($j['total_pago'], 0) ?></span>
                                     <button onclick="removerJogador(<?= $j['id'] ?>, '<?= $j['nome'] ?>')" class="text-[9px] text-slate-300 hover:text-red-400 font-bold uppercase">Remover</button>
                                 </div>
                             </td>
                             <?php foreach($pags as $p): ?>
-                            <td class="px-1 py-3 text-center">
-                                <button onclick="togglePagamento(<?= $p['id'] ?>, <?= $p['pago'] ?>)" 
-                                    class="pay-btn rounded-xl font-black transition-all inline-flex items-center justify-center shadow-sm
+                            <td class="px-1 py-1 text-center">                            
+                                <button onclick="post({ acao: 'toggle_pagamento', id: <?= $p['id'] ?>, valor: 40 })" 
+                                    class="pay-btn rounded-md font-black transition-all inline-flex items-center justify-center shadow-sm
                                     <?= $p['pago'] ? 'bg-green-500 text-white shadow-green-100' : 'bg-slate-100 text-slate-300 border border-slate-200' ?>">
                                     <?= $p['pago'] ? 'OK' : '—' ?>
                                 </button>
@@ -323,9 +312,6 @@ $transacoes = $stmt_t->fetchAll(PDO::FETCH_ASSOC);
         if (pago) {
             const r = await Swal.fire({ title: 'Estornar?', text: 'Deseja remover este pagamento do caixa?', icon: 'warning', showCancelButton: true, confirmButtonColor: '#ef4444' });
             if (r.isConfirmed) post({ acao: 'toggle_pagamento', id, valor: 0 });
-        } else {
-            const { value: v } = await Swal.fire({ title: 'Registar Pagamento', input: 'number', inputValue: 50, showCancelButton: true });
-            if (v) post({ acao: 'toggle_pagamento', id, valor: v });
         }
     }
     async function removerJogador(id, nome) {
